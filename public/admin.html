@@ -1,0 +1,157 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Admin Dashboard | 인사 분석 시스템</title>
+    <link rel="stylesheet" href="style.css?v=8">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+</head>
+<body>
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h1 data-i18n="admin_dashboard"><i class="fas fa-chart-pie"></i> 관리자 분석 대시보드</h1>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <!-- 언어 전환 버튼 -->
+                <div class="lang-toggle" style="background: var(--card-bg); padding: 0.5rem; border-radius: 0.5rem; display: flex; gap: 0.5rem;">
+                    <button onclick="setLanguage('ko')" style="padding: 0.3rem 0.6rem; background: var(--background); font-size: 1.2rem; width: auto; min-width: auto;" title="한국어">🇰🇷</button>
+                    <button onclick="setLanguage('vi')" style="padding: 0.3rem 0.6rem; background: var(--background); font-size: 1.2rem; width: auto; min-width: auto;" title="Tiếng Việt">🇻🇳</button>
+                </div>
+                <button onclick="location.href='index.html'" style="background: var(--card-bg);"><span data-i18n="back_list">메인으로 돌아가기</span></button>
+            </div>
+        </header>
+
+        <!-- 요약 스탯 -->
+        <div class="grid" style="grid-template-columns: repeat(3, 1fr);">
+            <div class="card stat-card">
+                <span class="stat-value" id="stat-total-emp">0</span>
+                <span class="stat-label" data-i18n="total_emp">총 직원 수</span>
+            </div>
+            <div class="card stat-card">
+                <span class="stat-value" id="stat-avg-score" style="color: var(--primary);">0</span>
+                <span class="stat-label" data-i18n="avg_score">전체 평균 점수</span>
+            </div>
+            <div class="card stat-card">
+                <span class="stat-value" id="stat-risk-count" style="color: var(--danger);">0</span>
+                <span class="stat-label" data-i18n="risk_group">위험군 (D등급)</span>
+            </div>
+        </div>
+
+        <div class="grid">
+            <!-- 차트 1: 팀별 성과 -->
+            <div class="card">
+                <h3 data-i18n="team_perf"><i class="fas fa-users-gear"></i> 팀별 평균 성과 추이</h3>
+                <canvas id="teamChart"></canvas>
+            </div>
+            <!-- 차트 2: 상위 랭킹 -->
+            <div class="card">
+                <h3 data-i18n="top_rank"><i class="fas fa-medal"></i> 기술 우수자 랭킹 (Top 5)</h3>
+                <canvas id="rankChart"></canvas>
+            </div>
+        </div>
+
+        <!-- AI 의사결정 추천 -->
+        <div class="card animate" style="margin-top: 2rem;">
+            <h2><i class="fas fa-robot"></i> AI 기반 인사 의사결정 추천</h2>
+            <div class="table-container">
+                <table>
+                    <thead>
+                        <tr>
+                            <th>이름</th>
+                            <th>현재 등급</th>
+                            <th>최종 점수</th>
+                            <th>AI 추천 분석</th>
+                        </tr>
+                    </thead>
+                    <tbody id="ai-results-body"></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // 페이지 로드 시 관리자용 데이터 호출
+        window.addEventListener('DOMContentLoaded', () => {
+            if (!localStorage.getItem('token')) {
+                location.href = 'index.html';
+                return;
+            }
+            loadAdminStats();
+            loadAIInsights();
+            loadCharts();
+        });
+
+        async function loadAdminStats() {
+            const res = await fetch('/dashboard/stats', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            document.getElementById('stat-total-emp').innerText = data.totalEmployees || 0;
+            document.getElementById('stat-avg-score').innerText = data.totalAvg ? data.totalAvg.toFixed(1) : 0;
+            document.getElementById('stat-risk-count').innerText = data.riskCount || 0;
+        }
+
+        async function loadAIInsights() {
+            const res = await fetch('/ai-decision', {
+                headers: { 'Authorization': `Bearer ${localStorage.getItem('token')}` }
+            });
+            const data = await res.json();
+            const body = document.getElementById('ai-results-body');
+            body.innerHTML = data.map(r => `
+                <tr>
+                    <td>${r.name}</td>
+                    <td><span class="badge badge-${r.grade}">${r.grade}</span></td>
+                    <td>${r.score}</td>
+                    <td style="font-weight: 600;">${r.advice}</td>
+                </tr>
+            `).join('');
+        }
+
+        async function loadCharts() {
+            const token = localStorage.getItem('token');
+            
+            // 팀별 통계
+            const teamRes = await fetch('/team-stats', { headers: { 'Authorization': `Bearer ${token}` } });
+            const teamData = await teamRes.json();
+            
+            new Chart(document.getElementById('teamChart'), {
+                type: 'bar',
+                data: {
+                    labels: teamData.map(d => d.team),
+                    datasets: [{
+                        label: translations[currentLang].avg_score,
+                        data: teamData.map(d => d.avgScore),
+                        backgroundColor: 'rgba(249, 115, 22, 0.5)',
+                        borderColor: '#f97316',
+                        borderWidth: 1
+                    }]
+                },
+                options: { scales: { y: { beginAtZero: true, max: 100 } } }
+            });
+
+            // 랭킹 통계
+            const rankRes = await fetch('/dashboard/summary', { headers: { 'Authorization': `Bearer ${token}` } });
+            const rankData = await rankRes.json();
+            const top5 = rankData.slice(0, 5);
+
+            new Chart(document.getElementById('rankChart'), {
+                type: 'radar',
+                data: {
+                    labels: top5.map(d => d.name),
+                    datasets: [{
+                        label: translations[currentLang].skills_chart,
+                        data: top5.map(d => d.score),
+                        fill: true,
+                        backgroundColor: 'rgba(168, 85, 247, 0.2)',
+                        borderColor: '#fbbf24',
+                        pointBackgroundColor: '#fbbf24'
+                    }]
+                },
+                options: { scales: { r: { beginAtZero: true, max: 100 } } }
+            });
+        }
+    </script>
+</body>
+</html>

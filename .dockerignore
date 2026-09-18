@@ -1,0 +1,12 @@
+node_modules
+node_portable
+database.sqlite
+uploads
+public/uploads
+backup
+*.xlsx
+*.log
+.env
+.git
+개선_로드맵.md
+배포_가이드.md

@@ -1,0 +1,1250 @@
+<!DOCTYPE html>
+<html lang="ko">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta http-equiv="Content-Security-Policy" content="default-src * 'unsafe-inline' 'unsafe-eval' data: blob:; script-src * 'unsafe-inline' 'unsafe-eval'; connect-src * 'unsafe-inline' 'unsafe-eval'; img-src * data: blob:; style-src * 'unsafe-inline';">
+    <title>직원 상세 정보 | HR Premium</title>
+    <link rel="stylesheet" href="style.css?v=8">
+    <script src="https://cdn.jsdelivr.net/npm/chart.js"></script>
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.0.0/css/all.min.css">
+    <style>
+        .detail-header {
+            display: flex;
+            gap: 2rem;
+            align-items: flex-start;
+            margin-bottom: 2rem;
+        }
+        .large-photo-container {
+            width: 260px;
+            height: 220px;
+            border-radius: 12px;
+            overflow: hidden;
+            border: 1px solid var(--border);
+            box-shadow: 0 1px 3px rgba(0,0,0,0.35);
+            background: var(--card-bg);
+            display: flex;
+            align-items: center;
+            justify-content: center;
+        }
+        .large-photo-container img {
+            width: 100%;
+            height: 100%;
+            object-fit: cover !important;
+            object-position: center 20% !important;
+        }
+        .large-photo-default {
+            font-size: 6rem;
+            color: var(--text-dim);
+        }
+        .history-row:hover {
+            background: rgba(249, 115, 22, 0.15) !important;
+            transition: 0.2s;
+        }
+        .history-row.selected-row {
+            background: rgba(249, 115, 22, 0.25) !important;
+            font-weight: bold;
+            border-left: 4px solid #f97316 !important;
+        }
+        .btn-edit-row {
+            background: rgba(249, 115, 22, 0.18);
+            color: #fb923c;
+            border: 1px solid rgba(249, 115, 22, 0.4);
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+            margin-right: 0.4rem;
+        }
+        .btn-edit-row:hover {
+            background: #ea580c;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(249, 115, 22, 0.5);
+            transform: scale(1.05);
+        }
+        .btn-delete-row {
+            background: rgba(239, 68, 68, 0.2);
+            color: #f87171;
+            border: 1px solid rgba(239, 68, 68, 0.4);
+            border-radius: 6px;
+            padding: 0.25rem 0.6rem;
+            font-size: 0.8rem;
+            cursor: pointer;
+            transition: 0.2s;
+            display: inline-flex;
+            align-items: center;
+            gap: 0.3rem;
+        }
+        .btn-delete-row:hover {
+            background: #ef4444;
+            color: #ffffff;
+            box-shadow: 0 0 10px rgba(239, 68, 68, 0.5);
+            transform: scale(1.05);
+        }
+        .info-grid {
+            flex: 1;
+            display: grid;
+            grid-template-columns: repeat(2, 1fr);
+            gap: 1.5rem;
+        }
+        .info-item {
+            background: var(--surface);
+            padding: 0.85rem 1.1rem;
+            border-radius: 8px;
+            border: 1px solid var(--border);
+        }
+        .info-label {
+            display: block;
+            font-size: 0.8rem;
+            color: var(--text-dim);
+            margin-bottom: 0.25rem;
+        }
+        .info-value {
+            font-size: 1.35rem;
+            font-weight: 700;
+            color: var(--text);
+        }
+        .chart-container {
+            height: 400px;
+            margin-top: 2rem;
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 2rem;">
+            <h1 data-i18n="title"><i class="fas fa-id-card"></i> 직원 상세 프로필</h1>
+            <div style="display: flex; gap: 1rem; align-items: center;">
+                <!-- 언어 전환 버튼 -->
+                <div class="lang-toggle" style="background: var(--card-bg); padding: 0.5rem; border-radius: 0.5rem; display: flex; gap: 0.5rem;">
+                    <button onclick="setLanguage('ko')" style="padding: 0.3rem 0.6rem; background: var(--background); font-size: 1.2rem; width: auto; min-width: auto;" title="한국어">🇰🇷</button>
+                    <button onclick="setLanguage('vi')" style="padding: 0.3rem 0.6rem; background: var(--background); font-size: 1.2rem; width: auto; min-width: auto;" title="Tiếng Việt">🇻🇳</button>
+                </div>
+                <!-- 출력 아이콘 버튼 추가 -->
+                <button onclick="window.print()" style="background: var(--card-bg);" id="btn-print" title="출력하기"><i class="fas fa-print"></i> <span data-i18n="print_btn">출력하기</span></button>
+                <button onclick="location.href='index.html'" style="background: var(--card-bg);"><i class="fas fa-arrow-left"></i> <span data-i18n="back_list">목록으로</span></button>
+            </div>
+        </header>
+
+        <div class="card animate">
+            <div class="detail-header">
+                <div class="large-photo-container" id="detail-photo">
+                    <i class="fas fa-user large-photo-default"></i>
+                </div>
+                <div class="info-grid">
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="name">이름</span>
+                        <span class="info-value" id="detail-name">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="team">팀 / 부서</span>
+                        <span class="info-value" id="detail-team">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="pos">직급</span>
+                        <span class="info-value" id="detail-pos">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="join">입사일</span>
+                        <span class="info-value" id="detail-join">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="birth">생년월일</span>
+                        <span class="info-value" id="detail-birth">-</span>
+                    </div>
+                    <div class="info-item">
+                        <span class="info-label" data-i18n="phone">전화번호</span>
+                        <span class="info-value" id="detail-phone">-</span>
+                    </div>
+                </div>
+            </div>
+        </div>
+
+        <div class="grid">
+            <div class="card animate">
+                <h3><i class="fas fa-chart-radar"></i> 종합 역량 분석</h3>
+                <div class="chart-container">
+                    <canvas id="empRadarChart"></canvas>
+                </div>
+                <div style="margin-top: 2rem;">
+                    <label style="color: var(--text-dim); font-weight: 600;"><i class="fas fa-comment-dots"></i> <span data-i18n="competency_desc">종합 역량 분석 의견</span></label>
+                    <textarea id="detail-competency-desc" style="width: 100%; height: 100px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;" data-i18n-placeholder="competency_desc_ph" placeholder="위 차트를 바탕으로 한 종합적인 역량 분석 의견을 기록하세요..."></textarea>
+                    <div id="print-competency-desc" class="print-only-text"></div>
+                </div>
+                <!-- 용접기능 평가표 바로가기 아이콘 버튼 추가 -->
+                <div style="margin-top: 1.5rem; display: flex; justify-content: center;" class="no-print">
+                    <button onclick="openWeldingModal()" class="welding-shortcut-btn">
+                        <i class="fas fa-fire-alt" style="font-size: 1.2rem; filter: drop-shadow(0 0 5px rgba(255,255,255,0.5));"></i>
+                        <span>용접기능 상세 평가표</span>
+                    </button>
+                </div>
+            </div>
+            <div class="card animate">
+                <h3 data-i18n="ai_advice"><i class="fas fa-robot"></i> AI 인사이드 추천</h3>
+                <div id="ai-advice-box" style="padding: 0.9rem 1.1rem; text-align: left; font-size: 1rem; line-height: 1.5; font-weight: 500; color: var(--text); background: rgba(249,115,22,0.08); border: 1px solid rgba(249,115,22,0.28); border-left: 3px solid var(--primary); border-radius: 8px;">
+                    데이터 분석 중...
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 1rem 0;">
+                <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                    <h4 style="margin:0;"><i class="fas fa-brain"></i> <span data-i18n="strengths">성격 장·단점 기록</span></h4>
+                    <button onclick="saveEmployeeInfo()" style="padding: 0.5rem 1rem; font-size: 0.9rem; background: var(--success);"><i class="fas fa-save"></i> <span data-i18n="save_btn">정보 저장</span></button>
+                </div>
+                <div class="grid" style="grid-template-columns: 1fr 1fr; gap: 1rem;">
+                    <div>
+                        <label style="color: var(--success); font-weight: 600;" data-i18n="strengths">[장점]</label>
+                        <textarea id="detail-strengths" style="width: 100%; height: 100px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem;" data-i18n-placeholder="strengths" placeholder="직원의 장점을 기록하세요..."></textarea>
+                        <div id="print-strengths" class="print-only-text"></div>
+                    </div>
+                    <div>
+                        <label style="color: var(--danger); font-weight: 600;" data-i18n="weaknesses">[단점]</label>
+                        <textarea id="detail-weaknesses" style="width: 100%; height: 100px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem;" data-i18n-placeholder="weaknesses" placeholder="개선이 필요한 점을 기록하세요..."></textarea>
+                        <div id="print-weaknesses" class="print-only-text"></div>
+                    </div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="color: var(--text-dim); font-weight: 600;"><i class="fas fa-heartbeat"></i> <span data-i18n="health">건강 상태 기록</span></label>
+                    <textarea id="detail-health" style="width: 100%; height: 80px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;" data-i18n-placeholder="health" placeholder="지병, 특이사항 등 건강 상태를 기록하세요..."></textarea>
+                    <div id="print-health" class="print-only-text"></div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="color: var(--text-dim); font-weight: 600;"><i class="fas fa-certificate"></i> <span data-i18n="certificates">자격증 보유현황</span></label>
+                    <textarea id="detail-certificates" style="width: 100%; height: 80px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;" data-i18n-placeholder="certificates" placeholder="보유 자격증 내역을 기록하세요..."></textarea>
+                    <div id="print-certificates" class="print-only-text"></div>
+                </div>
+                <div style="margin-top: 1rem;">
+                    <label style="color: var(--text-dim); font-weight: 600;"><i class="fas fa-users"></i> <span data-i18n="family_relations">가족관계</span></label>
+                    <textarea id="detail-family-relations" style="width: 100%; height: 80px; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 10px; padding: 0.8rem; font-size: 0.95rem; margin-top: 0.5rem;" data-i18n-placeholder="family_relations_ph" placeholder="가족 구성원 및 비상연락처를 기록하세요..."></textarea>
+                    <div id="print-family-relations" class="print-only-text"></div>
+                </div>
+                <hr style="border: 0; border-top: 1px solid var(--border); margin: 1rem 0;">
+                <h4 data-i18n="grade">최근 평가 등급</h4>
+                <div id="detail-grade-badge" style="text-align: center; margin-top: 1rem;">
+                    <span class="badge" style="font-size: 1.1rem; padding: 0.4rem 1.2rem;">-</span>
+                </div>
+            </div>
+        </div>
+
+        <div class="card animate" style="margin-top: 2rem;">
+            <div style="display: flex; justify-content: space-between; align-items: center; margin-bottom: 1rem;">
+                <h3 style="margin: 0;"><i class="fas fa-history"></i> <span data-i18n="history_table">전체 평가 히스토리</span></h3>
+                <button type="button" class="btn btn-secondary history-refresh-btn" onclick="reloadHistoryWithAnimation(this)" title="최신 히스토리 및 차트 새로고침">
+                    <i class="fas fa-sync-alt" id="refresh-history-icon"></i> <span data-i18n="refresh_btn">새로고침</span>
+                </button>
+            </div>
+            <div class="table-container">
+                <table id="history-table">
+                    <thead>
+                        <tr>
+                            <th data-i18n="date">날짜</th>
+                            <th data-i18n="welding">용접</th>
+                            <th data-i18n="centering">센터링</th>
+                            <th data-i18n="safety">안전위반</th>
+                            <th data-i18n="attendance">근태</th>
+                            <th data-i18n="tech">기술</th>
+                            <th data-i18n="score">점수</th>
+                            <th data-i18n="grade">등급</th>
+                            <th data-i18n="delete">관리 / 삭제</th>
+                        </tr>
+                    </thead>
+                    <tbody></tbody>
+                </table>
+            </div>
+        </div>
+    </div>
+
+    <script src="script.js"></script>
+    <script>
+        // 페이지 로드 시 정보 로드
+        window.addEventListener('DOMContentLoaded', () => {
+            const params = new URLSearchParams(window.location.search);
+            const empId = params.get('id');
+            
+            // 공용 setLanguage 함수를 상세 페이지용으로 가로채어(Override) 평가 내용 실시간 번역 연동
+            if (typeof setLanguage === 'function') {
+                const originalSetLanguage = setLanguage;
+                setLanguage = async function(lang) {
+                    originalSetLanguage(lang);
+                    await applyDataTranslation(lang);
+                    // 언어 변경 시 레이더 차트도 다국어로 실시간 갱신!
+                    if (window.latestEvaluationData) {
+                        updateDetailUI(window.latestEvaluationData);
+                    }
+                };
+            }
+            
+            // 언어 설정 적용 (가로채기 적용 버전 호출)
+            if (typeof setLanguage === 'function') {
+                setLanguage(localStorage.getItem('lang') || 'ko');
+            }
+            
+            if (empId) {
+                loadEmployeeDetail(empId);
+            } else {
+                alert('직원 정보를 찾을 수 없습니다.');
+                location.href = 'index.html';
+            }
+        });
+
+        async function loadEmployeeDetail(id) {
+            const token = localStorage.getItem('token');
+            try {
+                // 1. 기본 정보 로드
+                const empRes = await fetch('/employees', { headers: { 'Authorization': `Bearer ${token}` } });
+                const employees = await empRes.json();
+                const emp = employees.find(e => e.id == id);
+                
+                if (!emp) throw new Error('직원을 찾을 수 없습니다.');
+
+                document.getElementById('detail-name').innerText = emp.name;
+                document.getElementById('detail-team').innerText = emp.team;
+                document.getElementById('detail-pos').innerText = emp.position;
+                document.getElementById('detail-join').innerText = emp.join_date || '-';
+                document.getElementById('detail-birth').innerText = emp.birth_date || '-';
+                document.getElementById('detail-phone').innerText = emp.phone || '-';
+                
+                // 장/단점, 건강상태, 자격증, 가족관계, 역량분석 원본 한국어 데이터 백업 (다국어 연동 번역 목적)
+                window.originalEmployeeData = {
+                    strengths: emp.strengths || '',
+                    weaknesses: emp.weaknesses || '',
+                    health_status: emp.health_status || '',
+                    certificates: emp.certificates || '',
+                    family_relations: emp.family_relations || '',
+                    competency_desc: emp.competency_desc || '',
+                    welding_opinion: '' // 기본값
+                };
+
+                // 용접 상세 평가표 데이터 사전 조회 및 종합 역량 분석과 실시간 연동
+                window.weldingReportAvgScore = undefined;
+                try {
+                    const weldingRes = await fetch(`/employee/${id}/welding-report`, {
+                        headers: { 'Authorization': `Bearer ${token}` }
+                    });
+                    if (weldingRes.ok) {
+                        const weldingData = await weldingRes.json();
+                        if (weldingData) {
+                            window.originalEmployeeData.welding_opinion = weldingData.general_opinion || '';
+                            
+                            // 용접 상세 평가 의견이 존재하면 종합 역량 분석 의견에도 자동 연동
+                            if (weldingData.general_opinion) {
+                                if (!emp.competency_desc || emp.competency_desc.trim() === '') {
+                                    emp.competency_desc = weldingData.general_opinion;
+                                }
+                                window.originalEmployeeData.competency_desc = emp.competency_desc || weldingData.general_opinion;
+                            }
+                            
+                            // 용접 상세 6개 항목 평균 점수 계산 (1~5점 -> 0~100점 환산)
+                            const vSum = (weldingData.bead_visual || 0) + (weldingData.bead_penetration || 0) + (weldingData.bead_defect || 0) + 
+                                         (weldingData.pipe_backbead || 0) + (weldingData.pipe_alignment || 0) + (weldingData.pipe_defect || 0);
+                            if (vSum > 0) {
+                                window.weldingReportAvgScore = (vSum / 6) * 20;
+                            }
+                        }
+                    }
+                } catch (weldingErr) {
+                    console.error('용접 보고서 사전 로딩 실패:', weldingErr);
+                }
+
+                // 현재 활성화된 언어 설정에 맞추어 실시간 번역 렌더링
+                await applyDataTranslation(localStorage.getItem('lang') || 'ko');
+
+                if (emp.photo) {
+                    document.getElementById('detail-photo').innerHTML = `<img src="${emp.photo}" alt="${emp.name}">`;
+                }
+
+                // 2. 히스토리 로드 (캐시 파괴 ?_t= 적용으로 무조건 최신 DB 데이터 획득)
+                const cacheBuster = `?_t=${Date.now()}`;
+                const historyRes = await fetch(`/history/${id}${cacheBuster}`, { headers: { 'Authorization': `Bearer ${token}` } });
+                const history = await historyRes.json();
+                window.globalEvaluationHistory = history;
+                
+                const tbody = document.querySelector('#history-table tbody');
+                if (history.length > 0) {
+                    tbody.innerHTML = history.map((h, idx) => `
+                        <tr onclick="selectHistoryRow(${idx})" class="history-row ${idx === 0 ? 'selected-row' : ''}" style="cursor: pointer;" title="클릭하여 이 시점의 종합 역량 차트 보기">
+                            <td>${new Date(h.created_at).toLocaleDateString()}</td>
+                            <td>${render5Stars(h.welding)}</td>
+                            <td>${render5Stars(h.centering)}</td>
+                            <td>${h.safety_violation}</td>
+                            <td>${render5Stars(h.strength_status)}</td>
+                            <td>${render5Stars(h.tech_eval)}</td>
+                            <td>${h.score}</td>
+                            <td><span class="badge badge-${h.grade}">${h.grade}</span></td>
+                            <td>
+                                <button type="button" class="btn-edit-row" onclick="openEditEvalModal(event, ${idx})" title="이 평가 기록 수정">
+                                    <i class="fas fa-edit"></i> 수정
+                                </button>
+                                <button type="button" class="btn-delete-row" onclick="deleteHistoryRecord(event, ${h.id})" title="이 평가 기록 삭제">
+                                    <i class="fas fa-trash-alt"></i> 삭제
+                                </button>
+                            </td>
+                        </tr>
+                    `).join('');
+
+                    // 최신 데이터로 차트 및 등급 업데이트
+                    const latest = history[0];
+                    window.latestEvaluationData = latest; // 전역 데이터 저장
+                    updateDetailUI(latest);
+                } else {
+                    tbody.innerHTML = '<tr><td colspan="9">평가 기록이 없습니다.</td></tr>';
+                    const dummyLatest = {
+                        grade: 'B',
+                        welding: window.weldingReportAvgScore ? window.weldingReportAvgScore / 20 : 4,
+                        centering: 3,
+                        safety_violation: 0,
+                        strength_status: 3,
+                        tech_eval: 3,
+                        late: 0,
+                        absent: 0
+                    };
+                    updateDetailUI(dummyLatest);
+                }
+
+                // 3. AI 조언 로드 (전체 목록에서 필터링)
+                const aiRes = await fetch('/ai-decision', { headers: { 'Authorization': `Bearer ${token}` } });
+                const aiData = await aiRes.json();
+                const myAi = aiData.find(a => a.name === emp.name);
+                if (myAi) {
+                    document.getElementById('ai-advice-box').innerText = myAi.advice;
+                }
+
+            } catch (err) {
+                console.warn('데이터 로드 감지 로그:', err);
+            }
+        }
+
+        function updateDetailUI(data) {
+            // 등급 배지
+            const badgeBox = document.getElementById('detail-grade-badge');
+            badgeBox.innerHTML = `<span class="badge badge-${data.grade}" style="font-size: 2.5rem; padding: 1rem 3rem;">${data.grade}</span>`;
+
+            // 다국어 라벨 획득
+            const lang = localStorage.getItem('lang') || 'ko';
+            const chartLabels = [
+                translations[lang].chart_welding || '용접',
+                translations[lang].chart_centering || '센터링',
+                translations[lang].chart_safety || '안전관리',
+                translations[lang].chart_attendance || '근태관리',
+                translations[lang].chart_tech || '기술역량'
+            ];
+            const datasetLabel = translations[lang].chart_current_val || '현재 역량 수치';
+
+            // 용접 점수 연동: 평가 히스토리 수치(data.welding)를 최우선 대입 (1~5점 -> 0~100 환산)
+            const finalWeldingScore = Math.min(100, Math.max(0, (data.welding !== undefined ? data.welding : 4) * 20));
+
+            // 중복 그리기 방지: 기존 차트 인스턴스가 존재할 경우 파괴(destroy)
+            if (window.empRadarChartInstance) {
+                window.empRadarChartInstance.destroy();
+            }
+
+            // 레이더 차트 인스턴스 저장 및 생성
+            window.empRadarChartInstance = new Chart(document.getElementById('empRadarChart'), {
+                type: 'radar',
+                data: {
+                    labels: chartLabels,
+                    datasets: [{
+                        label: datasetLabel,
+                        data: [
+                            // 용접: 용접 상세 평가표 점수 연동 수치
+                            finalWeldingScore,
+                            // 센터링: 1~5점 → 0~100
+                            Math.min(100, Math.max(0, (data.centering || 0) * 20)),
+                            // 안전관리: 안전위반 0회 = 100점 만점! (1회당 20점 감점: 0회=100점, 1회=80점, 2회=60점...)
+                            Math.min(100, Math.max(0, 100 - (data.safety_violation || 0) * 20)),
+                            // 근태관리: late(지각)·absent(결근) 횟수 기반 감점
+                            Math.min(100, Math.max(0, 100 - ((data.late || 0) + (data.absent || 0) * 2) * 10)),
+                            // 기술역량: 1~5점 → 0~100
+                            Math.min(100, Math.max(0, data.tech_eval * 20))
+                        ],
+                        fill: true,
+                        backgroundColor: 'rgba(249, 115, 22, 0.4)',
+                        borderColor: '#ea580c',
+                        pointBackgroundColor: '#ea580c',
+                        pointBorderColor: '#fff',
+                        pointRadius: 6,
+                        borderWidth: 4
+                    }]
+                },
+                options: {
+                    plugins: {
+                        legend: {
+                            labels: {
+                                color: '#cbd5e1',
+                                font: { size: 16 }
+                            }
+                        }
+                    },
+                    scales: {
+                        r: {
+                            angleLines: { color: 'rgba(255,255,255,0.15)' },
+                            grid: { color: 'rgba(255,255,255,0.15)' },
+                            pointLabels: {
+                                color: '#cbd5e1',
+                                font: {
+                                    size: 18,
+                                    weight: 'bold'
+                                }
+                            },
+                            beginAtZero: true,
+                            max: 100,
+                            ticks: { display: false }
+                        }
+                    }
+                }
+            });
+        }
+
+        // 히스토리 목록 행 클릭 시 해당 시점 데이터로 종합 역량 차트 연동
+        function selectHistoryRow(idx) {
+            if (!window.globalEvaluationHistory || !window.globalEvaluationHistory[idx]) return;
+            const targetData = window.globalEvaluationHistory[idx];
+
+            const rows = document.querySelectorAll('.history-row');
+            rows.forEach((r, i) => {
+                if (i === idx) r.classList.add('selected-row');
+                else r.classList.remove('selected-row');
+            });
+
+            updateDetailUI(targetData);
+        }
+
+        // 특정 평가 히스토리 삭제 기능 (DOM 즉시 제거 + DB 영구 삭제)
+        async function deleteHistoryRecord(event, evalId) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            
+            if (!evalId || evalId === 'undefined') {
+                alert('삭제 대상 ID가 유효하지 않습니다.');
+                return;
+            }
+
+            if (!confirm('정말로 이 평가 기록을 삭제하시겠습니까? 🗑️')) return;
+
+            const targetBtn = event ? (event.currentTarget || event.target) : null;
+            const targetRow = targetBtn ? targetBtn.closest('tr') : null;
+
+            const token = localStorage.getItem('token');
+            try {
+                const headers = {};
+                if (token) headers['Authorization'] = `Bearer ${token}`;
+
+                const res = await fetch(`/evaluation/${evalId}`, {
+                    method: 'DELETE',
+                    headers: headers
+                });
+                
+                if (res.ok) {
+                    // 1. 화면에서 해당 행 즉시 제거 (눈앞에서 즉시 100% 싹 사라짐)
+                    if (targetRow) {
+                        targetRow.remove();
+                    }
+
+                    // 2. 전역 히스토리 배열 업데이트
+                    if (window.globalEvaluationHistory) {
+                        window.globalEvaluationHistory = window.globalEvaluationHistory.filter(h => String(h.id) !== String(evalId));
+                    }
+
+                    // 3. 남은 히스토리 중 가장 최신 데이터로 차트 갱신
+                    if (window.globalEvaluationHistory && window.globalEvaluationHistory.length > 0) {
+                        updateDetailUI(window.globalEvaluationHistory[0]);
+                    } else {
+                        const tbody = document.querySelector('#history-table tbody');
+                        if (tbody) tbody.innerHTML = '<tr><td colspan="9">평가 기록이 없습니다.</td></tr>';
+                        updateDetailUI({
+                            grade: 'B',
+                            welding: window.weldingReportAvgScore ? window.weldingReportAvgScore / 20 : 3,
+                            centering: 3, safety_violation: 0, strength_status: 3, tech_eval: 3, late: 0, absent: 0
+                        });
+                    }
+
+                    alert('평가 기록이 깨끗하게 삭제되었습니다. ✅');
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`삭제 처리 실패: ${errData.error || '서버 오류'}`);
+                }
+            } catch (err) {
+                console.error('평가 기록 삭제 오류:', err);
+                alert('네트워크 처리 오류가 발생했습니다.');
+            }
+        }
+
+        // 전체 평가 히스토리 실시간 새로고침 (캐시파괴 + 화면 100% 재로드)
+        async function reloadHistoryWithAnimation(btn) {
+            const icon = btn ? (btn.querySelector('#refresh-history-icon') || btn.querySelector('.fa-sync-alt')) : null;
+            if (icon) icon.classList.add('fa-spin');
+            
+            // 페이지 및 DB 최신 상태 확정 갱신
+            setTimeout(() => {
+                window.location.reload();
+            }, 300);
+        }
+
+        // 평가 히스토리 수정 모달 오픈
+        function openEditEvalModal(event, idx) {
+            if (event) {
+                event.stopPropagation();
+                event.preventDefault();
+            }
+            if (!window.globalEvaluationHistory || !window.globalEvaluationHistory[idx]) return;
+            
+            const h = window.globalEvaluationHistory[idx];
+            document.getElementById('edit-eval-id').value = h.id;
+            document.getElementById('edit-eval-date').value = new Date(h.created_at).toLocaleString();
+            document.getElementById('edit-eval-welding').value = h.welding;
+            document.getElementById('edit-eval-centering').value = h.centering;
+            document.getElementById('edit-eval-safety').value = h.safety_violation || 0;
+            document.getElementById('edit-eval-strength').value = h.strength_status;
+            document.getElementById('edit-eval-tech').value = h.tech_eval;
+            
+            document.getElementById('edit-eval-modal').style.display = 'flex';
+        }
+
+        function closeEditEvalModal() {
+            document.getElementById('edit-eval-modal').style.display = 'none';
+        }
+
+        async function saveEditEval(event) {
+            event.preventDefault();
+            const evalId = document.getElementById('edit-eval-id').value;
+            const welding = parseFloat(document.getElementById('edit-eval-welding').value) || 1;
+            const centering = parseFloat(document.getElementById('edit-eval-centering').value) || 1;
+            const safety_violation = parseInt(document.getElementById('edit-eval-safety').value) || 0;
+            const strength_status = parseFloat(document.getElementById('edit-eval-strength').value) || 1;
+            const tech_eval = parseFloat(document.getElementById('edit-eval-tech').value) || 1;
+
+            const token = localStorage.getItem('token');
+            const headers = { 'Content-Type': 'application/json' };
+            if (token) headers['Authorization'] = `Bearer ${token}`;
+
+            try {
+                const res = await fetch(`/evaluation/${evalId}`, {
+                    method: 'PUT',
+                    headers: headers,
+                    body: JSON.stringify({ welding, centering, safety_violation, strength_status, tech_eval, late: 0, absent: 0 })
+                });
+
+                if (res.ok) {
+                    const resData = await res.json();
+                    
+                    // 전역 배열 객체 즉시 갱신
+                    if (window.globalEvaluationHistory) {
+                        const target = window.globalEvaluationHistory.find(h => String(h.id) === String(evalId));
+                        if (target) {
+                            target.welding = welding;
+                            target.centering = centering;
+                            target.safety_violation = safety_violation;
+                            target.strength_status = strength_status;
+                            target.tech_eval = tech_eval;
+                            if (resData.score) target.score = resData.score;
+                            if (resData.grade) target.grade = resData.grade;
+                        }
+                    }
+
+                    alert('평가 기록이 성공적으로 수정 저장되었습니다. ✏️✅');
+                    closeEditEvalModal();
+                    await loadEmployeeDetail(); // 100% 즉시 갱신!
+                } else {
+                    const errData = await res.json().catch(() => ({}));
+                    alert(`수정 저장 실패: ${errData.error || '서버 오류'}`);
+                }
+            } catch (err) {
+                console.error('평가 수정 오류:', err);
+                alert('네트워크 처리 오류가 발생했습니다.');
+            }
+        }
+
+        async function saveEmployeeInfo() {
+            const params = new URLSearchParams(window.location.search);
+            const empId = params.get('id');
+            const token = localStorage.getItem('token');
+            const strengths = document.getElementById('detail-strengths').value;
+            const weaknesses = document.getElementById('detail-weaknesses').value;
+            const health_status = document.getElementById('detail-health').value;
+            const certificates = document.getElementById('detail-certificates').value;
+            const competency_desc = document.getElementById('detail-competency-desc').value;
+            const family_relations = document.getElementById('detail-family-relations').value;
+
+            try {
+                const res = await fetch(`/employee/${empId}`, {
+                    method: 'PATCH',
+                    headers: { 
+                        'Authorization': `Bearer ${token}`,
+                        'Content-Type': 'application/json'
+                    },
+                    body: JSON.stringify({ strengths, weaknesses, health_status, certificates, competency_desc, family_relations })
+                });
+
+                if (res.ok) {
+                    // 저장 성공 시, 현재 모드가 한국어라면 최신 원본 백업 데이터 갱신
+                    if (currentLang === 'ko') {
+                        window.originalEmployeeData = { strengths, weaknesses, health_status, certificates, competency_desc, family_relations };
+                    }
+                    alert(translations[currentLang].save_success);
+                } else {
+                    alert(translations[currentLang].save_fail);
+                }
+            } catch (err) {
+                console.error(err);
+                alert(translations[currentLang].network_error);
+            }
+        }
+
+        // --- 실시간 구글 무료 다국어 번역 엔진 연동 ---
+        async function translateText(text, fromLang, toLang) {
+            if (!text || text.trim() === '') return '';
+            try {
+                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromLang}&tl=${toLang}&dt=t&q=${encodeURIComponent(text)}`;
+                const res = await fetch(url);
+                const data = await res.json();
+                if (data && data[0]) {
+                    return data[0].map(item => item[0]).join('');
+                }
+                return text;
+            } catch (err) {
+                console.error('번역 중 네트워크 오류:', err);
+                return text; // 오류 시 원래 텍스트 복원 보장
+            }
+        }
+
+        // 실시간 직원의 평가내용 번역 적용 로직
+        async function applyDataTranslation(lang) {
+            if (!window.originalEmployeeData) return;
+
+            const textareas = {
+                'detail-strengths': window.originalEmployeeData.strengths,
+                'detail-weaknesses': window.originalEmployeeData.weaknesses,
+                'detail-health': window.originalEmployeeData.health_status,
+                'detail-certificates': window.originalEmployeeData.certificates,
+                'detail-family-relations': window.originalEmployeeData.family_relations,
+                'detail-competency-desc': window.originalEmployeeData.competency_desc,
+                'welding-opinion': window.originalEmployeeData.welding_opinion // 용접 종합의견 추가!
+            };
+
+            for (const [id, originalValue] of Object.entries(textareas)) {
+                const el = document.getElementById(id);
+                if (!el) continue;
+
+                if (lang === 'vi') {
+                    // 베트남어 모드 적용 시 실시간 로딩 효과 및 구글 API 번역
+                    el.readOnly = true;
+                    el.style.opacity = '0.7';
+                    const tempPlaceholder = el.placeholder;
+                    el.placeholder = "베트남어로 실시간 번역 중... (Đang dịch...)";
+                    el.value = "번역 중... (Đang dịch...)";
+
+                    const translated = await translateText(originalValue, 'ko', 'vi');
+                    el.value = translated;
+                    if (tempPlaceholder) el.placeholder = tempPlaceholder;
+                    el.readOnly = false;
+                    el.style.opacity = '1';
+                } else {
+                    // 한국어 모드 전환 시 캐시된 원본 한국어로 초고속 즉시 원복
+                    el.value = originalValue;
+                }
+            }
+        }
+
+        // 인쇄 직전 textarea의 내용을 인쇄용 div에 복사하는 이벤트 리스너 추가
+        window.addEventListener('beforeprint', () => {
+            const textareas = ['detail-competency-desc', 'detail-strengths', 'detail-weaknesses', 'detail-health', 'detail-certificates', 'detail-family-relations', 'welding-opinion'];
+            textareas.forEach(id => {
+                const ta = document.getElementById(id);
+                let targetId = 'print-' + id.split('-').slice(1).join('-');
+                if (id === 'welding-opinion') targetId = 'print-welding-opinion';
+                
+                const printDiv = document.getElementById(targetId);
+                if (ta && printDiv) {
+                    printDiv.innerText = ta.value || '-';
+                }
+            });
+        });
+
+        // 용접 기능 상세 평가표 전용 인쇄 호출기
+        function printWeldingReport() {
+            document.body.classList.add('print-welding-mode');
+            
+            const ta = document.getElementById('welding-opinion');
+            const printDiv = document.getElementById('print-welding-opinion');
+            if (ta && printDiv) {
+                printDiv.innerText = ta.value || '-';
+            }
+            
+            window.print();
+        }
+        
+        window.addEventListener('afterprint', () => {
+            document.body.classList.remove('print-welding-mode');
+        });
+
+        // --- 용접기능 평가표 관련 모달 및 비즈니스 로직 ---
+        // 엘리먼트 로딩 시점을 고려하여 런타임에 직접 엘리먼트를 획득해 사용합니다.
+
+        // 모달 내 별점 컴포넌트 이벤트 리스너 설정
+        function initWeldingStars() {
+            const starRatings = document.querySelectorAll('#welding-report-form .star-rating');
+            starRatings.forEach(container => {
+                const stars = container.querySelectorAll('.fa-star');
+                const inputId = container.getAttribute('data-input-id');
+                const input = document.getElementById(inputId);
+
+                stars.forEach(star => {
+                    star.addEventListener('click', () => {
+                        const val = parseInt(star.getAttribute('data-value'));
+                        input.value = val;
+                        updateStarDisplay(container, val);
+                        liveCalcWeldingScore();
+                    });
+                });
+            });
+        }
+
+        // 실시간 점수 및 등급 계산기
+        function liveCalcWeldingScore() {
+            const fields = ['bead-visual', 'bead-penetration', 'bead-defect', 'pipe-backbead', 'pipe-alignment', 'pipe-defect'];
+            let total = 0;
+            let count = 0;
+
+            fields.forEach(id => {
+                const val = parseInt(document.getElementById(id).value) || 0;
+                if (val > 0) {
+                    total += val;
+                    count++;
+                }
+            });
+
+            const liveScoreEl = document.getElementById('live-avg-score');
+            const liveGradeEl = document.getElementById('live-grade');
+
+            if (count === 0) {
+                liveScoreEl.innerText = '-';
+                liveGradeEl.className = 'badge badge-D';
+                liveGradeEl.innerText = 'D';
+                return;
+            }
+
+            const avg = total / count; // 1~5점 평균
+            const finalScore = avg * 20; // 100점 만점 기준
+
+            liveScoreEl.innerText = finalScore.toFixed(1) + '점';
+
+            // 등급 기준
+            let grade = 'D';
+            if (finalScore >= 90) grade = 'A';
+            else if (finalScore >= 75) grade = 'B';
+            else if (finalScore >= 60) grade = 'C';
+
+            liveGradeEl.innerText = grade;
+            liveGradeEl.className = `badge badge-${grade}`;
+        }
+
+        // 용접 평가 모달 열기
+        async function openWeldingModal() {
+            const weldingModal = document.getElementById('welding-modal');
+            if (!weldingModal) {
+                console.error("용접 모달 엘리먼트를 찾지 못했습니다.");
+                return;
+            }
+            const params = new URLSearchParams(window.location.search);
+            const empId = params.get('id');
+            const token = localStorage.getItem('token');
+            
+            // 직원 정보를 모달 상단 정보란에 동적 반영
+            const empName = document.getElementById('detail-name').innerText;
+            const empTeam = document.getElementById('detail-team').innerText;
+            const empPos = document.getElementById('detail-pos').innerText;
+            
+            document.getElementById('welding-emp-name').innerText = empName;
+            document.getElementById('welding-emp-team').innerText = empTeam;
+            document.getElementById('welding-emp-pos').innerText = empPos;
+            
+            // 폼 초기화
+            document.getElementById('welding-report-form').reset();
+            document.getElementById('photo-preview-container').innerHTML = `
+                <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--text-dim); margin-bottom: 0.5rem;"></i>
+                <p style="font-size: 0.9rem; color: var(--text-dim);" data-i18n="welding_photo_hint">${translations[currentLang].welding_photo_hint}</p>
+            `;
+            
+            const fields = ['bead-visual', 'bead-penetration', 'bead-defect', 'pipe-backbead', 'pipe-alignment', 'pipe-defect'];
+            fields.forEach(id => {
+                document.getElementById(id).value = '0';
+                const container = document.querySelector(`[data-input-id="${id}"]`);
+                updateStarDisplay(container, 0);
+            });
+
+            document.getElementById('welding-opinion').value = '';
+            
+            try {
+                // 기존 평가 내역 조회
+                const res = await fetch(`/employee/${empId}/welding-report`, {
+                    headers: { 'Authorization': `Bearer ${token}` }
+                });
+                
+                if (res.ok) {
+                    const data = await res.json();
+                    if (data) {
+                        // 이전 점수 및 데이터 세팅
+                        document.getElementById('bead-visual').value = data.bead_visual;
+                        updateStarDisplay(document.querySelector('[data-input-id="bead-visual"]'), data.bead_visual);
+                        
+                        document.getElementById('bead-penetration').value = data.bead_penetration;
+                        updateStarDisplay(document.querySelector('[data-input-id="bead-penetration"]'), data.bead_penetration);
+                        
+                        document.getElementById('bead-defect').value = data.bead_defect;
+                        updateStarDisplay(document.querySelector('[data-input-id="bead-defect"]'), data.bead_defect);
+                        
+                        document.getElementById('pipe-backbead').value = data.pipe_backbead;
+                        updateStarDisplay(document.querySelector('[data-input-id="pipe-backbead"]'), data.pipe_backbead);
+                        
+                        document.getElementById('pipe-alignment').value = data.pipe_alignment;
+                        updateStarDisplay(document.querySelector('[data-input-id="pipe-alignment"]'), data.pipe_alignment);
+                        
+                        document.getElementById('pipe-defect').value = data.pipe_defect;
+                        updateStarDisplay(document.querySelector('[data-input-id="pipe-defect"]'), data.pipe_defect);
+
+                        // 원본 평가자 종합 의견 백업 갱신
+                        if (window.originalEmployeeData) {
+                            window.originalEmployeeData.welding_opinion = data.general_opinion || '';
+                        }
+
+                        // 현재 활성화된 언어 설정에 맞춰 번역하여 대입
+                        const el = document.getElementById('welding-opinion');
+                        if (currentLang === 'vi') {
+                            el.readOnly = true;
+                            el.style.opacity = '0.7';
+                            const tempPlaceholder = el.placeholder;
+                            el.placeholder = "베트남어로 실시간 번역 중... (Đang dịch...)";
+                            el.value = "번역 중... (Đang dịch...)";
+
+                            const translated = await translateText(data.general_opinion || '', 'ko', 'vi');
+                            el.value = translated;
+                            if (tempPlaceholder) el.placeholder = tempPlaceholder;
+                            el.readOnly = false;
+                            el.style.opacity = '1';
+                        } else {
+                            el.value = data.general_opinion || '';
+                        }
+
+                        if (data.photo_path) {
+                            document.getElementById('photo-preview-container').innerHTML = `
+                                <img src="${data.photo_path}" class="welding-photo-preview">
+                            `;
+                        }
+                    }
+                }
+            } catch (err) {
+                console.error('용접 보고서 로드 중 오류:', err);
+            }
+
+            liveCalcWeldingScore();
+            weldingModal.style.display = 'flex';
+        }
+
+        // 용접 평가 모달 닫기
+        function closeWeldingModal() {
+            const weldingModal = document.getElementById('welding-modal');
+            if (weldingModal) {
+                weldingModal.style.display = 'none';
+            }
+        }
+
+        // 평가 사진 미리보기
+        function previewWeldingPhoto(input) {
+            const file = input.files[0];
+            if (file) {
+                const reader = new FileReader();
+                reader.onload = function(e) {
+                    document.getElementById('photo-preview-container').innerHTML = `
+                        <img src="${e.target.result}" class="welding-photo-preview">
+                    `;
+                };
+                reader.readAsDataURL(file);
+            }
+        }
+
+        // 용접 보고서 데이터 저장
+        async function saveWeldingReport(event) {
+            event.preventDefault();
+            const params = new URLSearchParams(window.location.search);
+            const empId = params.get('id');
+            const token = localStorage.getItem('token');
+
+            const fields = ['bead-visual', 'bead-penetration', 'bead-defect', 'pipe-backbead', 'pipe-alignment', 'pipe-defect'];
+            
+            // 점수 필수 기입 유효성 검사
+            for(let id of fields) {
+                const val = parseInt(document.getElementById(id).value) || 0;
+                if(val === 0) {
+                    alert('모든 평가 항목에 점수(별점)를 입력해 주세요!');
+                    return;
+                }
+            }
+
+            const formData = new FormData();
+            formData.append('bead_visual', document.getElementById('bead-visual').value);
+            formData.append('bead_penetration', document.getElementById('bead-penetration').value);
+            formData.append('bead_defect', document.getElementById('bead-defect').value);
+            formData.append('pipe_backbead', document.getElementById('pipe-backbead').value);
+            formData.append('pipe_alignment', document.getElementById('pipe-alignment').value);
+            formData.append('pipe_defect', document.getElementById('pipe-defect').value);
+            formData.append('general_opinion', document.getElementById('welding-opinion').value);
+
+            const fileInput = document.getElementById('welding-photo-input');
+            if (fileInput.files[0]) {
+                formData.append('welding_photo', fileInput.files[0]);
+            }
+
+            try {
+                const res = await fetch(`/employee/${empId}/welding-report`, {
+                    method: 'POST',
+                    headers: { 'Authorization': `Bearer ${token}` },
+                    body: formData
+                });
+
+                if (res.ok) {
+                    const weldingOpinion = document.getElementById('welding-opinion').value;
+                    
+                    // 종합 역량 분석 의견 텍스트 상자 및 인쇄용 백업에 즉시 실시간 연동
+                    const compDescEl = document.getElementById('detail-competency-desc');
+                    const printCompEl = document.getElementById('print-competency-desc');
+                    if (compDescEl && weldingOpinion) compDescEl.value = weldingOpinion;
+                    if (printCompEl && weldingOpinion) printCompEl.innerText = weldingOpinion;
+
+                    if (window.originalEmployeeData) {
+                        window.originalEmployeeData.welding_opinion = weldingOpinion;
+                        if (weldingOpinion) window.originalEmployeeData.competency_desc = weldingOpinion;
+                    }
+
+                    // 종합 역량 분석 의견 정보도 함께 DB 동기화 저장
+                    try {
+                        const strengths = document.getElementById('detail-strengths').value;
+                        const weaknesses = document.getElementById('detail-weaknesses').value;
+                        const health_status = document.getElementById('detail-health').value;
+                        const certificates = document.getElementById('detail-certificates').value;
+                        const family_relations = document.getElementById('detail-family-relations').value;
+                        const competency_desc = compDescEl ? compDescEl.value : weldingOpinion;
+
+                        await fetch(`/employee/${empId}`, {
+                            method: 'PATCH',
+                            headers: { 
+                                'Authorization': `Bearer ${token}`,
+                                'Content-Type': 'application/json'
+                            },
+                            body: JSON.stringify({ strengths, weaknesses, health_status, certificates, competency_desc, family_relations })
+                        });
+                    } catch (syncErr) {
+                        console.error('종합 역량 동기화 오류:', syncErr);
+                    }
+
+                    alert('용접 상세 평가표와 종합 역량 분석표가 연동되어 저장되었습니다. ✅');
+                    closeWeldingModal();
+                    loadEmployeeDetail(); // 실시간 연동 및 차트 갱신!
+                } else {
+                    const err = await res.json();
+                    alert(`저장 실패: ${err.error}`);
+                }
+            } catch (err) {
+                console.error('용접 보고서 저장 실패:', err);
+                alert('네트워크 저장 오류 발생');
+            }
+        }
+
+        // DOM 로드 시 별점 컴포넌트 초기화
+        window.addEventListener('DOMContentLoaded', () => {
+            initWeldingStars();
+        });
+    </script>
+
+    <!-- 용접기능 평가표 모달 구조 -->
+    <div id="welding-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content card animate">
+            <div class="modal-header">
+                <h2 style="margin: 0; background: linear-gradient(to right, #f97316, #ea580c); -webkit-background-clip: text; -webkit-text-fill-color: transparent; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-fire-alt" style="color: #f97316;"></i> <span id="welding-modal-title" data-i18n="welding_modal_title">용접 기능 상세 평가표</span></h2>
+                <button type="button" onclick="closeWeldingModal()" class="btn-close"><i class="fas fa-times"></i></button>
+            </div>
+            
+            <!-- 평가 대상 직원 요약 정보 영역 -->
+            <div class="welding-emp-info" style="display: flex; gap: 1.5rem; background: var(--surface); padding: 0.8rem 1.2rem; border-radius: 8px; margin-bottom: 1.5rem; border: 1px solid var(--border);">
+                <div><span style="color: var(--text-dim);" data-i18n="welding_info_name">평가 대상자:</span> <strong id="welding-emp-name" style="color: var(--text); font-size: 1.1rem;">-</strong></div>
+                <div><span style="color: var(--text-dim);" data-i18n="welding_info_team">소속 부서:</span> <strong id="welding-emp-team" style="color: var(--text); font-size: 1.1rem;">-</strong></div>
+                <div><span style="color: var(--text-dim);" data-i18n="welding_info_pos">직급:</span> <strong id="welding-emp-pos" style="color: var(--text); font-size: 1.1rem;">-</strong></div>
+            </div>
+            
+            <form id="welding-report-form" onsubmit="saveWeldingReport(event)">
+                <div class="modal-grid">
+                    <!-- 비드 용접 영역 -->
+                    <div class="welding-section">
+                        <h3 class="section-title"><i class="fas fa-grip-lines"></i> <span data-i18n="bead_welding_title">비드 용접 (Bead Welding)</span></h3>
+                        <div class="form-group">
+                            <label data-i18n="bead_visual_label">1. 비드 외관 균일성 (Appearance)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="bead-visual">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="bead-visual" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="bead_penetration_label">2. 용융 및 용입 상태 (Penetration)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="bead-penetration">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="bead-penetration" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="bead_defect_label">3. 언더컷/오버랩 결함 유무 (Defects)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="bead-defect">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="bead-defect" value="0">
+                        </div>
+                    </div>
+
+                    <!-- 파이프 용접 영역 -->
+                    <div class="welding-section">
+                        <h3 class="section-title"><i class="fas fa-circle-notch"></i> <span data-i18n="pipe_welding_title">파이프 용접 (Pipe Welding)</span></h3>
+                        <div class="form-group">
+                            <label data-i18n="pipe_backbead_label">1. 백비드(이면비드) 형성 상태 (Backbead)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="pipe-backbead">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="pipe-backbead" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="pipe_alignment_label">2. 맞대기 조인트 정렬 정밀도 (Alignment)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="pipe-alignment">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="pipe-alignment" value="0">
+                        </div>
+                        <div class="form-group">
+                            <label data-i18n="pipe_defect_label">3. 기공 및 슬래그 결함 유무 (Defects)</label>
+                            <div class="star-rating-container" style="background: var(--surface); padding: 0.5rem; border-radius: 6px; border: 1px solid var(--border); display: inline-flex;">
+                                <div class="star-rating" data-input-id="pipe-defect">
+                                    <i class="fas fa-star" data-value="1"></i>
+                                    <i class="fas fa-star" data-value="2"></i>
+                                    <i class="fas fa-star" data-value="3"></i>
+                                    <i class="fas fa-star" data-value="4"></i>
+                                    <i class="fas fa-star" data-value="5"></i>
+                                </div>
+                            </div>
+                            <input type="hidden" id="pipe-defect" value="0">
+                        </div>
+                    </div>
+                </div>
+
+                <!-- 사진 첨부 및 코멘트 영역 -->
+                <div class="modal-row">
+                    <div class="photo-upload-section">
+                        <label style="color: #f97316; font-weight: bold;"><i class="fas fa-camera"></i> <span data-i18n="welding_photo_label">용접 평가 사진 첨부</span></label>
+                        <div class="photo-dropzone" onclick="document.getElementById('welding-photo-input').click()">
+                            <input type="file" id="welding-photo-input" style="display: none;" accept="image/*" onchange="previewWeldingPhoto(this)">
+                            <div id="photo-preview-container" style="width: 100%; height: 100%; display: flex; flex-direction: column; align-items: center; justify-content: center;">
+                                <i class="fas fa-cloud-upload-alt" style="font-size: 2.5rem; color: var(--text-dim); margin-bottom: 0.5rem;"></i>
+                                <p style="font-size: 0.9rem; color: var(--text-dim);" data-i18n="welding_photo_hint">평가 사진을 업로드하려면 클릭하세요</p>
+                            </div>
+                        </div>
+                    </div>
+                    
+                    <div class="opinion-section">
+                        <label style="color: var(--text-dim); font-weight: bold;"><i class="fas fa-comment-medical"></i> <span data-i18n="welding_opinion_label">평가자 종합 의견</span></label>
+                        <textarea id="welding-opinion" style="width: 100%; height: 120px; margin-top: 0.5rem; background: var(--surface); color: var(--text); border: 1px solid var(--border); border-radius: 8px; padding: 0.8rem;" data-i18n-placeholder="welding_opinion_ph" placeholder="용접 작업 결과에 대한 평가의견을 입력하세요..."></textarea>
+                        <div id="print-welding-opinion" class="print-welding-opinion"></div>
+                    </div>
+                </div>
+
+                <!-- 실시간 스코어 및 저장 영역 -->
+                <div class="modal-footer">
+                    <div class="live-score-box">
+                        <span style="font-size: 1rem; color: var(--text-dim);" data-i18n="welding_avg_score">평가 평균 점수</span>
+                        <span id="live-avg-score" style="font-size: 2rem; font-weight: 800; color: #4ade80;">-</span>
+                        <span id="live-grade" class="badge badge-D" style="margin-left: 0.5rem;">D</span>
+                    </div>
+                    <div style="display: flex; gap: 1rem;" class="no-print">
+                        <button type="button" onclick="printWeldingReport()" style="background: linear-gradient(135deg, #0ea5e9 0%, #0284c7 100%); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-weight: 600; display: inline-flex; align-items: center; gap: 0.5rem;"><i class="fas fa-print"></i> <span data-i18n="print_btn">인쇄하기</span></button>
+                        <button type="button" onclick="closeWeldingModal()" style="background: var(--surface); color: var(--text); border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer;" data-i18n="cancel_btn">취소</button>
+                        <button type="submit" style="background: linear-gradient(45deg, #f97316, #ea580c); color: white; border: none; padding: 0.75rem 1.5rem; border-radius: 0.5rem; cursor: pointer; font-weight: 600;"><i class="fas fa-save"></i> <span data-i18n="welding_save_btn">평가 저장</span></button>
+                    </div>
+                </div>
+            </form>
+        </div>
+    </div>
+
+    <!-- 평가 히스토리 수정 모달 -->
+    <div id="edit-eval-modal" class="modal-overlay" style="display: none;">
+        <div class="modal-content card animate" style="max-width: 550px;">
+            <div class="modal-header">
+                <h3 style="margin: 0; color: #fb923c; display: flex; align-items: center; gap: 0.5rem;"><i class="fas fa-edit"></i> <span>평가 히스토리 데이터 수정</span></h3>
+                <button type="button" onclick="closeEditEvalModal()" class="btn-close"><i class="fas fa-times"></i></button>
+            </div>
+            <form id="edit-eval-form" onsubmit="saveEditEval(event)">
+                <input type="hidden" id="edit-eval-id">
+                <div style="display: flex; flex-direction: column; gap: 1.2rem; padding: 0.5rem 0;">
+                    <div>
+                        <label style="color: var(--text-dim); font-size: 0.9rem;">평가 일자</label>
+                        <input type="text" id="edit-eval-date" readonly style="width: 100%; background: var(--surface); color: var(--text-dim); border: 1px solid var(--border); border-radius: 8px; padding: 0.6rem; font-weight: bold; margin-top: 0.3rem;">
+                    </div>
+                    <div style="display: grid; grid-template-columns: 1fr 1fr; gap: 1rem;">
+                        <div>
+                            <label style="color: #fbbf24; font-weight: 600;">1. 용접 역량 (1~5점)</label>
+                            <input type="number" id="edit-eval-welding" min="1" max="5" step="0.5" required style="width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.6rem; margin-top: 0.3rem;">
+                        </div>
+                        <div>
+                            <label style="color: #fbbf24; font-weight: 600;">2. 센터링 (1~5점)</label>
+                            <input type="number" id="edit-eval-centering" min="1" max="5" step="0.5" required style="width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.6rem; margin-top: 0.3rem;">
+                        </div>
+                        <div>
+                            <label style="color: #f87171; font-weight: 600;">3. 안전 위반 (횟수)</label>
+                            <input type="number" id="edit-eval-safety" min="0" max="10" required style="width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.6rem; margin-top: 0.3rem;">
+                        </div>
+                        <div>
+                            <label style="color: #fbbf24; font-weight: 600;">4. 근태/체력 (1~5점)</label>
+                            <input type="number" id="edit-eval-strength" min="1" max="5" step="0.5" required style="width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.6rem; margin-top: 0.3rem;">
+                        </div>
+                    </div>
+                    <div>
+                        <label style="color: #fbbf24; font-weight: 600;">5. 기술 역량 (1~5점)</label>
+                        <input type="number" id="edit-eval-tech" min="1" max="5" step="0.5" required style="width: 100%; background: var(--surface); color: var(--text); border: 1px solid var(--border-strong); border-radius: 8px; padding: 0.6rem; margin-top: 0.3rem;">
+                    </div>
+                </div>
+                <div style="display: flex; justify-content: flex-end; gap: 0.8rem; margin-top: 1.5rem;">
+                    <button type="button" class="btn btn-secondary" onclick="closeEditEvalModal()" style="padding: 0.6rem 1.2rem; border-radius: 8px; background: var(--surface); color: var(--text); border: none; cursor: pointer;">취소</button>
+                    <button type="submit" class="btn btn-primary" style="padding: 0.6rem 1.2rem; border-radius: 8px; background: linear-gradient(135deg, #f97316 0%, #ea580c 100%); color: white; border: none; cursor: pointer; font-weight: bold;"><i class="fas fa-save"></i> 수정 저장</button>
+                </div>
+            </form>
+        </div>
+    </div>
+</body>
+</html>

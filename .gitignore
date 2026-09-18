@@ -1,0 +1,11 @@
+node_modules/
+.env
+database.sqlite
+uploads/
+public/uploads/
+backup/
+*.log
+*.xlsx
+node_portable/
+.DS_Store
+.npm-cache/

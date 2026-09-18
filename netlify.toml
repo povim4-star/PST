@@ -1,0 +1,94 @@
+# Netlify 설정 — 정적 프론트(public/) 서빙 + API는 Render 백엔드로 프록시
+# 배포 전에 아래 BACKEND 주소를 실제 Render 앱 주소로 모두 바꾸세요.
+# 예) https://hrm-backend.onrender.com
+
+[build]
+  publish = "public"
+  command = ""
+
+# --- API 프록시 (status=200 = 리라이트, force=true = 정적보다 우선) ---
+# /uploads/* 는 프록시하지 않음 → 기존 사진은 Netlify 정적으로 서빙됨.
+
+[[redirects]]
+  from = "/health"
+  to = "https://YOUR-RENDER-APP.onrender.com/health"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/login"
+  to = "https://YOUR-RENDER-APP.onrender.com/login"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/register"
+  to = "https://YOUR-RENDER-APP.onrender.com/register"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/employees"
+  to = "https://YOUR-RENDER-APP.onrender.com/employees"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/employee"
+  to = "https://YOUR-RENDER-APP.onrender.com/employee"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/employee/*"
+  to = "https://YOUR-RENDER-APP.onrender.com/employee/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/evaluation"
+  to = "https://YOUR-RENDER-APP.onrender.com/evaluation"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/evaluation/*"
+  to = "https://YOUR-RENDER-APP.onrender.com/evaluation/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/history/*"
+  to = "https://YOUR-RENDER-APP.onrender.com/history/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/dashboard/*"
+  to = "https://YOUR-RENDER-APP.onrender.com/dashboard/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/ai-decision"
+  to = "https://YOUR-RENDER-APP.onrender.com/ai-decision"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/team-stats"
+  to = "https://YOUR-RENDER-APP.onrender.com/team-stats"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/upload"
+  to = "https://YOUR-RENDER-APP.onrender.com/upload"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/export/*"
+  to = "https://YOUR-RENDER-APP.onrender.com/export/:splat"
+  status = 200
+  force = true

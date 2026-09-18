@@ -1,0 +1,30 @@
+# Render 백엔드 배포 블루프린트
+# Render > New > Blueprint 로 이 리포를 연결하면 자동 인식됩니다.
+services:
+  - type: web
+    name: hrm-backend
+    runtime: node
+    plan: free
+    buildCommand: npm install
+    startCommand: node server.js
+    healthCheckPath: /health
+    envVars:
+      - key: NODE_ENV
+        value: production
+      - key: HOST
+        value: 0.0.0.0
+      - key: DATABASE_SSL
+        value: "true"
+      - key: SUPABASE_BUCKET
+        value: photos
+      # 아래는 대시보드에서 직접 입력 (민감정보)
+      - key: JWT_SECRET
+        sync: false
+      - key: ADMIN_PASSWORD
+        sync: false
+      - key: DATABASE_URL
+        sync: false
+      - key: SUPABASE_URL
+        sync: false
+      - key: SUPABASE_SERVICE_KEY
+        sync: false
