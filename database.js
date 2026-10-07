@@ -1,4 +1,5 @@
 const path = require('path');
+const { postgresConfig } = require('./postgres-config');
 
 function normalizeArgs(params, callback) {
     if (typeof params === 'function') {
@@ -24,14 +25,7 @@ function postgresSql(sql) {
 class PostgresDatabase {
     constructor(connectionString, callback) {
         const { Pool } = require('pg');
-        const isLocal = /localhost|127\.0\.0\.1|\bpostgres\b/i.test(connectionString);
-        const useSsl = process.env.DATABASE_SSL === 'true' ||
-            (process.env.DATABASE_SSL !== 'false' && !isLocal);
-
-        this.pool = new Pool({
-            connectionString,
-            ssl: useSsl ? { rejectUnauthorized: false } : false
-        });
+        this.pool = new Pool(postgresConfig(connectionString));
         this.serializing = false;
         this.serialQueue = Promise.resolve();
 

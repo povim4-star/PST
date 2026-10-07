@@ -1,5 +1,11 @@
 node_modules/
 .env
+.env.*
+!.env.example
+*.sqlite*
+*.db
+.security-test/
+.migration-runtime/
 database.sqlite
 uploads/
 public/uploads/

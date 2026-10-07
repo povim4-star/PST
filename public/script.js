@@ -450,7 +450,7 @@ async function loadEmployees() {
     // 평가 폼의 셀렉트 박스 업데이트
     const select = document.getElementById('eval-emp-id');
     if (select) {
-        select.innerHTML = employees.map(e => `<option value="${e.id}">${e.name} (${e.team})</option>`).join('');
+        select.innerHTML = employees.map(e => `<option value="${Number(e.id)}">${escapeHtml(e.name)} (${escapeHtml(e.team)})</option>`).join('');
     }
 
     // 대시보드 요약 정보와 결합하여 리스트 출력
@@ -493,17 +493,17 @@ function renderEmployeeTable() {
             <td>
                 <div class="photo-edit-wrapper">
                     ${e.photo ?
-                        `<img src="${e.photo}" class="photo-circle" onerror="this.parentElement.innerHTML='<div class=\'photo-circle-default\'><i class=\'fas fa-user\'></i></div>'">` :
+                        `<img data-private-src="${escapeHtml(e.photo)}" class="photo-circle" onerror="this.parentElement.innerHTML='<div class=\'photo-circle-default\'><i class=\'fas fa-user\'></i></div>'">` :
                         `<div class="photo-circle-default"><i class="fas fa-user"></i></div>`
                     }
                 </div>
             </td>
-            <td style="font-weight: 600;">${e.name}</td>
-            <td>${e.team}</td>
-            <td>${e.position}</td>
+            <td style="font-weight: 600;">${escapeHtml(e.name)}</td>
+            <td>${escapeHtml(e.team)}</td>
+            <td>${escapeHtml(e.position)}</td>
             <td>${renderStars(e.score)}</td>
-            <td><span class="badge badge-${e.grade}">${e.grade}</span></td>
-            <td><button onclick="location.href='detail.html?id=${e.id}'" style="padding: 0.3rem 0.7rem; font-size: 0.8rem;" data-i18n="history_btn">${translations[currentLang].history_btn}</button></td>
+            <td><span class="badge badge-${escapeHtml(e.grade)}">${escapeHtml(e.grade)}</span></td>
+            <td><button onclick="location.href='detail.html?id=${Number(e.id)}'" style="padding: 0.3rem 0.7rem; font-size: 0.8rem;" data-i18n="history_btn">${translations[currentLang].history_btn}</button></td>
         </tr>
     `).join('');
 

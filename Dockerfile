@@ -2,12 +2,13 @@ FROM node:20-bookworm-slim
 
 WORKDIR /app
 
-COPY package.json ./
-RUN npm install --omit=dev
+COPY package.json package-lock.json ./
+RUN npm ci --omit=dev
 
-COPY database.js server.js ./
+COPY database.js server.js security.js postgres-config.js ./
 COPY public ./public
 COPY scripts ./scripts
+COPY certs ./certs
 
 RUN mkdir -p /data/uploads && chown -R node:node /app /data
 

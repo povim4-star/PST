@@ -6,6 +6,9 @@ const xlsx = require('xlsx');
 const cors = require('cors');
 const path = require('path');
 const fs = require('fs');
+const helmet = require('helmet');
+const { rateLimit } = require('express-rate-limit');
+const { imageType, imageFile, privateTablesSql } = require('./security');
 const { createDatabase } = require('./database');
 
 const app = express();
@@ -16,6 +19,7 @@ const JWT_SECRET = process.env.JWT_SECRET || (isProduction ? '' : 'hr-premium-se
 const INITIAL_ADMIN_PASSWORD = process.env.ADMIN_PASSWORD || (isProduction ? '' : 'admin123');
 
 if (!JWT_SECRET) throw new Error('운영환경에서는 JWT_SECRET 환경변수가 필요합니다.');
+if (isProduction && JWT_SECRET.length < 32) throw new Error('JWT_SECRET은 32자 이상이어야 합니다.');
 if (!INITIAL_ADMIN_PASSWORD) throw new Error('운영환경에서는 ADMIN_PASSWORD 환경변수가 필요합니다.');
 
 // 업로드 디렉토리 확보
@@ -24,10 +28,23 @@ if (!fs.existsSync(uploadsDir)) {
     fs.mkdirSync(uploadsDir);
 }
 
+app.disable('x-powered-by');
+if (process.env.RENDER) app.set('trust proxy', 1);
+app.use(helmet({ contentSecurityPolicy: { directives: {
+    defaultSrc: ["'self'"], scriptSrc: ["'self'", "'unsafe-inline'", 'https://cdn.jsdelivr.net'],
+    scriptSrcAttr: ["'unsafe-inline'"], styleSrc: ["'self'", "'unsafe-inline'", 'https://cdnjs.cloudflare.com', 'https://fonts.googleapis.com'],
+    fontSrc: ["'self'", 'https://cdnjs.cloudflare.com', 'https://fonts.gstatic.com'],
+    imgSrc: ["'self'", 'blob:', 'data:'], connectSrc: ["'self'"], objectSrc: ["'none'"],
+    upgradeInsecureRequests: isProduction ? [] : null
+} } }));
 app.use(cors({ origin: process.env.CORS_ORIGIN || false }));
-app.use(express.json());
-app.use('/uploads', express.static(uploadsDir));
+app.use(express.json({ limit: '64kb' }));
+app.use('/uploads', (req, res) => res.sendStatus(404));
 app.use(express.static(path.join(__dirname, 'public')));
+app.use((req, res, next) => { res.set('Cache-Control', 'no-store'); next(); });
+const loginLimiter = rateLimit({ windowMs: 15 * 60 * 1000, limit: 20, standardHeaders: 'draft-8', legacyHeaders: false });
+const uploadLimiter = rateLimit({ windowMs: 60 * 1000, limit: 60, standardHeaders: 'draft-8', legacyHeaders: false });
+const dummyPasswordHash = bcrypt.hashSync('계정 존재 여부 숨김용 임의 문자열', 10);
 
 app.get('/health', (req, res) => {
     db.get('SELECT 1 AS ok', (err) => {
@@ -41,7 +58,7 @@ const db = createDatabase((err) => {
     if (err) {
         console.error('Database connection error:', err);
     } else {
-        console.log('Connected to SQLite Database.');
+        console.log('Database connected.');
         initDatabase();
     }
 });
@@ -78,11 +95,11 @@ function initDatabase() {
         db.run(`CREATE TABLE IF NOT EXISTS evaluations (
             id INTEGER PRIMARY KEY AUTOINCREMENT,
             employee_id INTEGER,
-            welding INTEGER,
-            centering INTEGER,
-            safety_violation INTEGER,
-            strength_status INTEGER,
-            tech_eval INTEGER,
+            welding REAL,
+            centering REAL,
+            safety_violation REAL,
+            strength_status REAL,
+            tech_eval REAL,
             late INTEGER,
             absent INTEGER,
             score REAL,
@@ -104,7 +121,10 @@ function initDatabase() {
             created_at TEXT
         )`);
 
-        // 기본 관리자 계정 생성 (admin / admin123)
+        if (process.env.DATABASE_URL) db.run(privateTablesSql, (err) => {
+            if (err) { console.error('HR 테이블 접근 차단 실패'); process.exit(1); }
+        });
+        // 기본 관리자 계정 생성
         db.get(`SELECT * FROM users WHERE username = 'admin'`, (err, row) => {
             if (!row) {
                 bcrypt.hash(INITIAL_ADMIN_PASSWORD, 10, (err, hash) => {
@@ -118,7 +138,9 @@ function initDatabase() {
 }
 
 // Multer: 메모리 저장 (서버리스/휘발성 디스크 대응)
-const upload = multer({ storage: multer.memoryStorage() });
+const upload = multer({ storage: multer.memoryStorage(), limits: {
+    fileSize: 5 * 1024 * 1024, files: 1, fields: 30, parts: 31, fieldSize: 16384
+} });
 
 // Supabase Storage (설정 시 사진을 영구 저장, 없으면 로컬 디스크 폴백)
 const SUPABASE_URL = process.env.SUPABASE_URL;
@@ -133,14 +155,12 @@ if (SUPABASE_URL && SUPABASE_SERVICE_KEY) {
 
 // 사진 저장: Supabase Storage 우선, 없으면 로컬 uploads 폴더
 async function savePhoto(file, originalname) {
-    const safe = (originalname || file.originalname || 'photo').replace(/[^\w.\-가-힣]/g, '_');
-    const filename = Date.now() + '-' + safe;
+    const { name: filename, mime } = imageFile(file);
     if (supabase) {
         const { error } = await supabase.storage.from(SUPABASE_BUCKET)
-            .upload(filename, file.buffer, { contentType: file.mimetype, upsert: false });
+            .upload(filename, file.buffer, { contentType: mime, upsert: false });
         if (error) throw error;
-        const { data } = supabase.storage.from(SUPABASE_BUCKET).getPublicUrl(filename);
-        return { url: data.publicUrl, key: filename };
+        return { url: `storage:${filename}`, key: filename };
     }
     fs.writeFileSync(path.join(uploadsDir, filename), file.buffer);
     return { url: `/uploads/${filename}`, key: filename };
@@ -154,29 +174,34 @@ async function deletePhoto(key) {
     } catch (_) { /* best-effort */ }
 }
 
-// JWT 인증 미들웨어 (모든 로그인 사용자는 권한 우회를 위해 admin 권한 부여)
+// 매 요청마다 현재 DB의 계정과 권한을 확인합니다.
 function authenticateToken(req, res, next) {
     const authHeader = req.headers['authorization'];
-    const token = authHeader && authHeader.split(' ')[1];
+    const token = /^Bearer ([^ ]+)$/.exec(authHeader || '')?.[1];
     
     if (!token) return res.status(401).json({ error: 'Token missing' });
 
-    jwt.verify(token, JWT_SECRET, (err, user) => {
+    jwt.verify(token, JWT_SECRET, { algorithms: ['HS256'] }, (err, user) => {
         if (err) return res.status(403).json({ error: 'Token invalid' });
-        req.user = user;
-        next();
+        db.get('SELECT id, username, role FROM users WHERE id = ?', [user.id], (dbErr, current) => {
+            if (dbErr) return res.status(503).json({ error: '인증 확인 실패' });
+            if (!current) return res.sendStatus(401);
+            if (current.role !== 'admin') return res.sendStatus(403);
+            req.user = current;
+            next();
+        });
     });
 }
 
 // --- API Endpoints ---
 
 // 1. 회원가입 (모든 신규 가입 유저도 admin 역할을 부여하여 업로드 제약 제거)
-app.post('/register', (req, res) => {
+app.post('/register', loginLimiter, authenticateToken, (req, res) => {
     if (process.env.ALLOW_REGISTRATION !== 'true') {
         return res.status(403).json({ error: 'Public registration is disabled' });
     }
     const { username, password } = req.body;
-    if (!username || !password) return res.status(400).json({ error: 'ID and Password are required' });
+    if (typeof username !== 'string' || username.length > 80 || typeof password !== 'string' || password.length < 12 || Buffer.byteLength(password) > 72) return res.status(400).json({ error: '계정명과 12자 이상 비밀번호가 필요합니다.' });
 
     bcrypt.hash(password, 10, (err, hash) => {
         if (err) return res.status(500).json({ error: 'Hashing error' });
@@ -194,24 +219,23 @@ app.post('/register', (req, res) => {
 });
 
 // 2. 로그인
-app.post('/login', (req, res) => {
+app.post('/login', loginLimiter, (req, res) => {
     const { username, password } = req.body;
+    if (typeof username !== 'string' || username.length > 80 || typeof password !== 'string' || Buffer.byteLength(password) > 72) return res.status(400).json({ error: '입력 형식 오류' });
     db.get(`SELECT * FROM users WHERE username = ?`, [username], (err, user) => {
         if (err) return res.status(500).json({ error: 'Database error' });
-        if (!user) return res.status(400).json({ error: 'User not found' });
-
-        bcrypt.compare(password, user.password, (err, result) => {
+        bcrypt.compare(password, user ? user.password : dummyPasswordHash, (err, result) => {
             if (err) return res.status(500).json({ error: 'Encryption error' });
-            if (!result) return res.status(400).json({ error: 'Password mismatch' });
+            if (!user || !result) return res.status(401).json({ error: '아이디 또는 비밀번호가 올바르지 않습니다.' });
 
-            const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '24h' });
+            const token = jwt.sign({ id: user.id, username: user.username, role: user.role }, JWT_SECRET, { expiresIn: '8h', algorithm: 'HS256' });
             res.json({ token, role: user.role });
         });
     });
 });
 
 // 3. 직원 등록 (사진 업로드 포함)
-app.post('/employee', authenticateToken, upload.single('photo'), async (req, res) => {
+app.post('/employee', authenticateToken, uploadLimiter, upload.single('photo'), async (req, res) => {
     const { name, team, position, join_date } = req.body;
     if (!name) return res.status(400).json({ error: 'Employee name is required' });
 
@@ -219,7 +243,7 @@ app.post('/employee', authenticateToken, upload.single('photo'), async (req, res
     try {
         if (req.file) photoPath = (await savePhoto(req.file)).url;
     } catch (e) {
-        return res.status(500).json({ error: 'Photo upload failed' });
+        return res.status(e.status === 415 ? 415 : 500).json({ error: e.status === 415 ? e.message : 'Photo upload failed' });
     }
 
     db.run(`INSERT INTO employees (name, team, position, photo, join_date) VALUES (?, ?, ?, ?, ?)`,
@@ -235,7 +259,7 @@ app.post('/employee', authenticateToken, upload.single('photo'), async (req, res
 app.get('/employees', authenticateToken, (req, res) => {
     db.all(`SELECT * FROM employees`, (err, rows) => {
         if (err) return res.status(500).json({ error: 'Database query error' });
-        res.json(rows);
+        res.json(rows.map(row => ({ ...row, photo: row.photo ? `/media/employees/${row.id}` : '' })));
     });
 });
 
@@ -245,7 +269,7 @@ app.get('/employee/:id', authenticateToken, (req, res) => {
     db.get(`SELECT * FROM employees WHERE id = ?`, [empId], (err, row) => {
         if (err) return res.status(500).json({ error: 'Database query error' });
         if (!row) return res.status(404).json({ error: 'Employee not found' });
-        res.json(row);
+        res.json({ ...row, photo: row.photo ? `/media/employees/${row.id}` : '' });
     });
 });
 
@@ -264,7 +288,7 @@ app.delete('/employee/:id', authenticateToken, (req, res) => {
 });
 
 // 6. 개별 직원 사진 업로드
-app.post('/employee/:id/photo', authenticateToken, upload.single('photo'), async (req, res) => {
+app.post('/employee/:id/photo', authenticateToken, uploadLimiter, upload.single('photo'), async (req, res) => {
     const empId = req.params.id;
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
@@ -272,16 +296,16 @@ app.post('/employee/:id/photo', authenticateToken, upload.single('photo'), async
     try {
         photoPath = (await savePhoto(req.file)).url;
     } catch (e) {
-        return res.status(500).json({ error: 'Photo upload failed' });
+        return res.status(e.status === 415 ? 415 : 500).json({ error: e.status === 415 ? e.message : 'Photo upload failed' });
     }
     db.run(`UPDATE employees SET photo = ? WHERE id = ?`, [photoPath, empId], function(err) {
         if (err) return res.status(500).json({ error: 'Update photo error' });
-        res.json({ success: true, photo: photoPath });
+        res.json({ success: true, photo: `/media/employees/${empId}` });
     });
 });
 
 // 7. 이름 매칭 벌크 사진 업로드
-app.post('/employee/photo-by-name', authenticateToken, upload.single('photo'), async (req, res) => {
+app.post('/employee/photo-by-name', authenticateToken, uploadLimiter, upload.single('photo'), async (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'No file uploaded' });
 
     // 파일명에서 이름만 추출 (예: '12345-홍길동.jpg' 또는 '홍길동.jpg')
@@ -294,7 +318,7 @@ app.post('/employee/photo-by-name', authenticateToken, upload.single('photo'), a
     try {
         saved = await savePhoto(req.file);
     } catch (e) {
-        return res.status(500).json({ error: 'Photo upload failed' });
+        return res.status(e.status === 415 ? 415 : 500).json({ error: e.status === 415 ? e.message : 'Photo upload failed' });
     }
 
     db.run(`UPDATE employees SET photo = ? WHERE name = ?`, [saved.url, cleanName], function(err) {
@@ -440,11 +464,11 @@ app.get('/ai-decision', authenticateToken, (req, res) => {
     const query = `
         SELECT emp.name, ev.grade 
         FROM employees emp
-        LEFT JOIN (
-            SELECT employee_id, grade, MAX(created_at)
-            FROM evaluations
-            GROUP BY employee_id
-        ) ev ON emp.id = ev.employee_id
+        LEFT JOIN evaluations ev ON ev.id = (
+            SELECT e2.id FROM evaluations e2
+            WHERE e2.employee_id = emp.id
+            ORDER BY e2.created_at DESC, e2.id DESC LIMIT 1
+        )
     `;
     
     db.all(query, (err, rows) => {
@@ -469,11 +493,11 @@ app.get('/ai-decision', authenticateToken, (req, res) => {
 });
 
 // 13. 엑셀 대용량 직원 업로드
-app.post('/upload', authenticateToken, upload.single('file'), (req, res) => {
+app.post('/upload', authenticateToken, uploadLimiter, upload.single('file'), (req, res) => {
     if (!req.file) return res.status(400).json({ error: 'Excel file is required' });
 
     try {
-        const workbook = xlsx.read(req.file.buffer, { type: 'buffer' });
+        const workbook = xlsx.read(req.file.buffer, { type: 'buffer', sheetRows: 5001, sheets: 0 });
         const sheetName = workbook.SheetNames[0];
         const sheet = workbook.Sheets[sheetName];
         
@@ -613,19 +637,19 @@ app.get('/employee/:id/welding-report', authenticateToken, (req, res) => {
     const empId = req.params.id;
     db.get(`SELECT * FROM welding_reports WHERE employee_id = ?`, [empId], (err, row) => {
         if (err) return res.status(500).json({ error: 'Database query error' });
-        res.json(row || null);
+        res.json(row ? { ...row, photo_path: row.photo_path ? `/media/welding/${empId}` : '' } : null);
     });
 });
 
 // 15. 특정 직원의 용접 기능 상세 평가표 저장 (사진 포함)
-app.post('/employee/:id/welding-report', authenticateToken, upload.single('welding_photo'), async (req, res) => {
+app.post('/employee/:id/welding-report', authenticateToken, uploadLimiter, upload.single('welding_photo'), async (req, res) => {
     const empId = req.params.id;
     const { bead_visual, bead_penetration, bead_defect, pipe_backbead, pipe_alignment, pipe_defect, general_opinion } = req.body;
     let photoPath = '';
     try {
         if (req.file) photoPath = (await savePhoto(req.file)).url;
     } catch (e) {
-        return res.status(500).json({ error: 'Photo upload failed' });
+        return res.status(e.status === 415 ? 415 : 500).json({ error: e.status === 415 ? e.message : 'Photo upload failed' });
     }
     const createdAt = new Date().toISOString();
 
@@ -742,6 +766,61 @@ app.get('/export/excel', authenticateToken, (req, res) => {
     });
 });
 
-app.listen(PORT, HOST, () => {
-    console.log(`Server is running on http://${HOST}:${PORT}`);
+app.get('/media/:kind/:id', authenticateToken, (req, res) => {
+    if (!['employees', 'welding'].includes(req.params.kind)) return res.sendStatus(404);
+    const config = { employees: ['employees', 'id', 'photo'], welding: ['welding_reports', 'employee_id', 'photo_path'] }[req.params.kind];
+    if (!config || !/^\d+$/.test(req.params.id)) return res.sendStatus(404);
+    const [table, id, column] = config;
+    db.get(`SELECT ${column} AS photo FROM ${table} WHERE ${id} = ?`, [req.params.id], async (err, row) => {
+        if (err) return res.sendStatus(500);
+        if (!row?.photo) return res.sendStatus(404);
+        try {
+            let buffer;
+            if (row.photo.startsWith('/uploads/')) {
+                const filename = decodeURIComponent(row.photo.slice(9));
+                if (filename !== path.basename(filename) || /[\\/\x00]/.test(filename)) return res.sendStatus(404);
+                buffer = await fs.promises.readFile(path.join(uploadsDir, filename));
+            } else {
+                if (!supabase) return res.sendStatus(404);
+                let key;
+                if (row.photo.startsWith('storage:')) key = row.photo.slice(8);
+                else {
+                    const url = new URL(row.photo);
+                    const prefix = `/storage/v1/object/public/${SUPABASE_BUCKET}/`;
+                    if (url.origin !== new URL(SUPABASE_URL).origin || !url.pathname.startsWith(prefix)) return res.sendStatus(404);
+                    key = decodeURIComponent(url.pathname.slice(prefix.length));
+                }
+                if (key.includes('..') || key.includes('\\')) return res.sendStatus(404);
+                const result = await supabase.storage.from(SUPABASE_BUCKET).download(key);
+                if (result.error) return res.sendStatus(404);
+                buffer = Buffer.from(await result.data.arrayBuffer());
+            }
+            const type = imageType(buffer);
+            if (!type) return res.sendStatus(415);
+            res.type(type[1]).send(buffer);
+        } catch (_) { res.sendStatus(404); }
+    });
 });
+
+app.use((err, req, res, next) => {
+    if (res.headersSent) return next(err);
+    const status = err.code === 'LIMIT_FILE_SIZE' ? 413 : (err instanceof multer.MulterError || err.status === 400 ? 400 : 500);
+    res.status(status).json({ error: status === 413 ? '파일은 5MB 이하여야 합니다.' : '요청을 처리하지 못했습니다.' });
+});
+
+async function start() {
+    // 공개 버킷도 시작 시 비공개로 전환하며, 실패하면 공개 상태로 서비스하지 않습니다.
+    if (supabase) {
+        const { data, error } = await supabase.storage.getBucket(SUPABASE_BUCKET);
+        const result = data
+            ? await supabase.storage.updateBucket(SUPABASE_BUCKET, { public: false })
+            : await supabase.storage.createBucket(SUPABASE_BUCKET, { public: false });
+        if (result.error) throw new Error('사진 버킷 비공개 설정 실패: ' + result.error.message);
+    }
+    return new Promise((resolve, reject) => {
+        const server = app.listen(PORT, HOST, () => { console.log(`Server is running on http://${HOST}:${PORT}`); resolve(server); });
+        server.on('error', reject);
+    });
+}
+if (require.main === module) start().catch(err => { console.error(err.message); process.exit(1); });
+module.exports = { start, db };

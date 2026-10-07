@@ -11,84 +11,90 @@
 
 [[redirects]]
   from = "/health"
-  to = "https://YOUR-RENDER-APP.onrender.com/health"
+  to = "https://pst-lyrz.onrender.com/health"
   status = 200
   force = true
 
 [[redirects]]
   from = "/login"
-  to = "https://YOUR-RENDER-APP.onrender.com/login"
+  to = "https://pst-lyrz.onrender.com/login"
   status = 200
   force = true
 
 [[redirects]]
   from = "/register"
-  to = "https://YOUR-RENDER-APP.onrender.com/register"
+  to = "https://pst-lyrz.onrender.com/register"
   status = 200
   force = true
 
 [[redirects]]
   from = "/employees"
-  to = "https://YOUR-RENDER-APP.onrender.com/employees"
+  to = "https://pst-lyrz.onrender.com/employees"
   status = 200
   force = true
 
 [[redirects]]
   from = "/employee"
-  to = "https://YOUR-RENDER-APP.onrender.com/employee"
+  to = "https://pst-lyrz.onrender.com/employee"
   status = 200
   force = true
 
 [[redirects]]
   from = "/employee/*"
-  to = "https://YOUR-RENDER-APP.onrender.com/employee/:splat"
+  to = "https://pst-lyrz.onrender.com/employee/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/evaluation"
-  to = "https://YOUR-RENDER-APP.onrender.com/evaluation"
+  to = "https://pst-lyrz.onrender.com/evaluation"
   status = 200
   force = true
 
 [[redirects]]
   from = "/evaluation/*"
-  to = "https://YOUR-RENDER-APP.onrender.com/evaluation/:splat"
+  to = "https://pst-lyrz.onrender.com/evaluation/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/history/*"
-  to = "https://YOUR-RENDER-APP.onrender.com/history/:splat"
+  to = "https://pst-lyrz.onrender.com/history/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/dashboard/*"
-  to = "https://YOUR-RENDER-APP.onrender.com/dashboard/:splat"
+  to = "https://pst-lyrz.onrender.com/dashboard/:splat"
   status = 200
   force = true
 
 [[redirects]]
   from = "/ai-decision"
-  to = "https://YOUR-RENDER-APP.onrender.com/ai-decision"
+  to = "https://pst-lyrz.onrender.com/ai-decision"
   status = 200
   force = true
 
 [[redirects]]
   from = "/team-stats"
-  to = "https://YOUR-RENDER-APP.onrender.com/team-stats"
+  to = "https://pst-lyrz.onrender.com/team-stats"
   status = 200
   force = true
 
 [[redirects]]
   from = "/upload"
-  to = "https://YOUR-RENDER-APP.onrender.com/upload"
+  to = "https://pst-lyrz.onrender.com/upload"
   status = 200
   force = true
 
 [[redirects]]
   from = "/export/*"
-  to = "https://YOUR-RENDER-APP.onrender.com/export/:splat"
+  to = "https://pst-lyrz.onrender.com/export/:splat"
+  status = 200
+  force = true
+
+[[redirects]]
+  from = "/media/*"
+  to = "https://pst-lyrz.onrender.com/media/:splat"
   status = 200
   force = true

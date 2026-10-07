@@ -256,6 +256,7 @@
         </div>
     </div>
 
+    <script src="security.js"></script>
     <script src="script.js"></script>
     <script>
         // 페이지 로드 시 정보 로드
@@ -352,7 +353,7 @@
                 await applyDataTranslation(localStorage.getItem('lang') || 'ko');
 
                 if (emp.photo) {
-                    document.getElementById('detail-photo').innerHTML = `<img src="${emp.photo}" alt="${emp.name}">`;
+                    document.getElementById('detail-photo').innerHTML = `<img data-private-src="${escapeHtml(emp.photo)}" alt="${escapeHtml(emp.name)}">`;
                 }
 
                 // 2. 히스토리 로드 (캐시 파괴 ?_t= 적용으로 무조건 최신 DB 데이터 획득)
@@ -368,16 +369,16 @@
                             <td>${new Date(h.created_at).toLocaleDateString()}</td>
                             <td>${render5Stars(h.welding)}</td>
                             <td>${render5Stars(h.centering)}</td>
-                            <td>${h.safety_violation}</td>
+                            <td>${escapeHtml(h.safety_violation)}</td>
                             <td>${render5Stars(h.strength_status)}</td>
                             <td>${render5Stars(h.tech_eval)}</td>
-                            <td>${h.score}</td>
-                            <td><span class="badge badge-${h.grade}">${h.grade}</span></td>
+                            <td>${escapeHtml(h.score)}</td>
+                            <td><span class="badge badge-${escapeHtml(h.grade)}">${escapeHtml(h.grade)}</span></td>
                             <td>
                                 <button type="button" class="btn-edit-row" onclick="openEditEvalModal(event, ${idx})" title="이 평가 기록 수정">
                                     <i class="fas fa-edit"></i> 수정
                                 </button>
-                                <button type="button" class="btn-delete-row" onclick="deleteHistoryRecord(event, ${h.id})" title="이 평가 기록 삭제">
+                                <button type="button" class="btn-delete-row" onclick="deleteHistoryRecord(event, ${Number(h.id)})" title="이 평가 기록 삭제">
                                     <i class="fas fa-trash-alt"></i> 삭제
                                 </button>
                             </td>
@@ -419,7 +420,7 @@
         function updateDetailUI(data) {
             // 등급 배지
             const badgeBox = document.getElementById('detail-grade-badge');
-            badgeBox.innerHTML = `<span class="badge badge-${data.grade}" style="font-size: 2.5rem; padding: 1rem 3rem;">${data.grade}</span>`;
+            badgeBox.innerHTML = `<span class="badge badge-${escapeHtml(data.grade)}" style="font-size: 2.5rem; padding: 1rem 3rem;">${escapeHtml(data.grade)}</span>`;
 
             // 다국어 라벨 획득
             const lang = localStorage.getItem('lang') || 'ko';
@@ -695,23 +696,10 @@
         }
 
         // --- 실시간 구글 무료 다국어 번역 엔진 연동 ---
-        async function translateText(text, fromLang, toLang) {
-            if (!text || text.trim() === '') return '';
-            try {
-                const url = `https://translate.googleapis.com/translate_a/single?client=gtx&sl=${fromLang}&tl=${toLang}&dt=t&q=${encodeURIComponent(text)}`;
-                const res = await fetch(url);
-                const data = await res.json();
-                if (data && data[0]) {
-                    return data[0].map(item => item[0]).join('');
-                }
-                return text;
-            } catch (err) {
-                console.error('번역 중 네트워크 오류:', err);
-                return text; // 오류 시 원래 텍스트 복원 보장
-            }
+        async function translateText(text) {
+            return text || '';
         }
 
-        // 실시간 직원의 평가내용 번역 적용 로직
         async function applyDataTranslation(lang) {
             if (!window.originalEmployeeData) return;
 
@@ -931,7 +919,7 @@
 
                         if (data.photo_path) {
                             document.getElementById('photo-preview-container').innerHTML = `
-                                <img src="${data.photo_path}" class="welding-photo-preview">
+                                <img data-private-src="${escapeHtml(data.photo_path)}" class="welding-photo-preview">
                             `;
                         }
                     }

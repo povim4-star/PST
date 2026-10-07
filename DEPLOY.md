@@ -11,12 +11,12 @@
 - `.env`는 커밋하지 마세요. 값은 각 서비스 대시보드에 입력합니다.
 
 ## 1. Supabase
-1. **Storage** > New bucket > 이름 `photos`, **Public 체크** > 생성.
+1. **Storage** > New bucket > 이름 `photos`, **Private(비공개)** > 생성. 서버도 시작 시 비공개 상태를 적용합니다.
 2. **Project Settings > API** 에서 복사:
    - `Project URL` → `SUPABASE_URL`
    - `service_role` 키 → `SUPABASE_SERVICE_KEY` (⚠️ 절대 프론트/깃에 노출 금지)
 3. **Project Settings > Database > Connection string > URI** 복사 → `DATABASE_URL`
-   - Render는 IPv4가 필요하므로 **Connection pooling(포트 6543)** 문자열 권장.
+   - **Session pooler(포트 5432)** 연결 문자열을 사용합니다.
    - URI의 `[YOUR-PASSWORD]` 를 실제 DB 비밀번호로 치환.
 
 ## 2. 데이터 이관 (로컬에서 한 번)
@@ -39,13 +39,13 @@ $env:SUPABASE_URL="https://<ref>.supabase.co"
 $env:SUPABASE_SERVICE_KEY="<service_role 키>"
 npm run migrate:photos
 ```
-- 로컬 `/uploads/...` 사진을 `photos` 버킷에 올리고 DB의 photo URL을 절대 URL로 교체합니다.
+- 로컬 `/uploads/...` 사진을 비공개 `photos` 버킷에 올리고 DB에 객체 키를 저장합니다. 사진은 로그인한 관리자가 `/media` API로 조회합니다.
 - 신규 업로드 사진도 자동으로 Storage에 저장되므로, 이후 모든 사진은 Supabase Storage 한 곳에서 서빙됩니다.
 - (사진은 개인정보라 깃/Netlify에 넣지 않습니다 — `.gitignore`에서 제외됨.)
 
 ## 3. 백엔드 → Render
 1. Render > **New > Blueprint** 로 리포 연결 (`render.yaml` 자동 인식). 또는 New > Web Service 수동:
-   - Build: `npm install` / Start: `node server.js` / Health check: `/health`
+   - Build: `npm ci` / Start: `node server.js` / Health check: `/health`
 2. **Environment** 에 입력:
    | 키 | 값 |
    |---|---|

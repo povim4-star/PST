@@ -27,6 +27,8 @@ echo  [이 창을 닫으면 서버가 종료됩니다]
 echo.
 
 :: 서버 실행
-node_portable\node.exe server.js
+set "ENVARG="
+if exist .env set "ENVARG=--env-file=.env"
+node_portable\node.exe %ENVARG% server.js
 
 pause

@@ -2,6 +2,8 @@ const path = require('path');
 const sqlite3 = require('sqlite3').verbose();
 const { Pool } = require('pg');
 const bcrypt = require('bcryptjs');
+const { privateTablesSql } = require('../security');
+const { postgresConfig } = require('../postgres-config');
 
 const connectionString = process.env.DATABASE_URL;
 if (!connectionString) {
@@ -16,15 +18,8 @@ if (!adminPassword) {
 }
 
 const sqlitePath = process.env.SQLITE_PATH || path.join(__dirname, '..', 'database.sqlite');
-const isLocal = /localhost|127\.0\.0\.1|\bpostgres\b/i.test(connectionString);
-const useSsl = process.env.DATABASE_SSL === 'true' ||
-    (process.env.DATABASE_SSL !== 'false' && !isLocal);
-
 const sqlite = new sqlite3.Database(sqlitePath, sqlite3.OPEN_READONLY);
-const postgres = new Pool({
-    connectionString,
-    ssl: useSsl ? { rejectUnauthorized: false } : false
-});
+const postgres = new Pool(postgresConfig(connectionString));
 
 function sqliteAll(sql) {
     return new Promise((resolve, reject) => {
@@ -59,11 +54,11 @@ async function createSchema(client) {
         CREATE TABLE IF NOT EXISTS evaluations (
             id SERIAL PRIMARY KEY,
             employee_id INTEGER,
-            welding INTEGER,
-            centering INTEGER,
-            safety_violation INTEGER,
-            strength_status INTEGER,
-            tech_eval INTEGER,
+            welding REAL,
+            centering REAL,
+            safety_violation REAL,
+            strength_status REAL,
+            tech_eval REAL,
             late INTEGER,
             absent INTEGER,
             score REAL,
@@ -83,6 +78,16 @@ async function createSchema(client) {
             created_at TEXT
         );
     `);
+    // 이미 INTEGER로 만들어진 테이블 보정 (평가 점수는 4.5 같은 소수 허용)
+    await client.query(`
+        ALTER TABLE evaluations
+            ALTER COLUMN welding TYPE REAL,
+            ALTER COLUMN centering TYPE REAL,
+            ALTER COLUMN safety_violation TYPE REAL,
+            ALTER COLUMN strength_status TYPE REAL,
+            ALTER COLUMN tech_eval TYPE REAL
+    `);
+    await client.query(privateTablesSql);
 }
 
 async function copyTable(client, table, keyColumn) {
@@ -119,6 +124,10 @@ async function main() {
     try {
         await client.query('BEGIN');
         await createSchema(client);
+
+        // 운영 중인 데이터를 로컬 기본키로 덮어쓰지 않습니다.
+        const existing = await client.query('SELECT (SELECT COUNT(*) FROM employees) + (SELECT COUNT(*) FROM evaluations) + (SELECT COUNT(*) FROM welding_reports) AS count');
+        if (Number(existing.rows[0].count) > 0) throw new Error('대상 DB에 이미 직원/평가 데이터가 있습니다. 병합 검토 후 이관해야 합니다.');
 
         const counts = {};
         counts.users = await copyTable(client, 'users', 'id');

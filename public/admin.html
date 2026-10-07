@@ -70,6 +70,7 @@
         </div>
     </div>
 
+    <script src="security.js"></script>
     <script src="script.js"></script>
     <script>
         // 페이지 로드 시 관리자용 데이터 호출
@@ -101,10 +102,10 @@
             const body = document.getElementById('ai-results-body');
             body.innerHTML = data.map(r => `
                 <tr>
-                    <td>${r.name}</td>
-                    <td><span class="badge badge-${r.grade}">${r.grade}</span></td>
-                    <td>${r.score}</td>
-                    <td style="font-weight: 600;">${r.advice}</td>
+                    <td>${escapeHtml(r.name)}</td>
+                    <td><span class="badge badge-${escapeHtml(r.grade)}">${escapeHtml(r.grade)}</span></td>
+                    <td>${escapeHtml(r.score)}</td>
+                    <td style="font-weight: 600;">${escapeHtml(r.advice)}</td>
                 </tr>
             `).join('');
         }
